@@ -1,7 +1,9 @@
 # O que é?
 São instruções executadas linha por linha, de cima para baixo, sem desvios ou repetições.
 # Uso no Mundo Real
-Quando você faz um cadastro em um site, o sistema executa uma sequência: recebe os dados, valida, salva no banco de dados e envia email de confirmação - tudo em ordem.
+Quando você faz um cadastro em um site,
+o sistema executa uma sequência: recebe os dados,
+valida, salva no banco de dados e envia email de confirmação - tudo em ordem.
 
 # Exemplo Contextualizado
 # ==========================================
