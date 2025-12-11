@@ -22,3 +22,20 @@
 # Valor da multa: R$ 195.00
 # Pontos na CNH: 5 pontos
 # Status: Multa aplicada
+
+velocidadePermitida = float(input("Qual a valocidade permitida na pista ?: "))
+veloCidadeDoVeiculo = float(input("Qual a velocidade do veiculo ?: "))
+
+infracaoLeve = 0.20 * velocidadePermitida
+infracaoMedia = 0.50 * velocidadePermitida
+
+if(veloCidadeDoVeiculo <= infracaoLeve):
+    print(f"""
+    ===============================
+          MULTA DE TRANSITO
+    ===============================
+          INFRAÇÃO: LEVE
+          VALOR: (R$ 130)
+          PONTOS NA CNH: 3
+""")
+print(infracaoLeve, infracaoMedia)

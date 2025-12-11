@@ -1,5 +1,5 @@
 print("=== sistema de cálculo de frete ===")
-
+ 
 # ENTRADA DE  DADOS
 peso = float(input("Peso do produto (kg): "))
 distancia = float(input("Distância em (km): "))
