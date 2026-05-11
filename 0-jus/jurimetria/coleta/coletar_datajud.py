@@ -85,10 +85,12 @@ ASSUNTOS_ESTADUAIS = [
 ]
 
 ASSUNTOS_TRABALHO = [
-    1412, 1407, 1408, 1413,   # remuneração
-    1399, 1401, 1403, 1406,   # rescisão
-    2493, 2643,               # danos
-    1396, 9532,               # vínculo
+    13787, 13769, 13186,      # horas extras
+    13994, 13996, 13995,      # rescisão: aviso prévio, férias, 13º
+    13998, 13999, 14000,      # FGTS e multas CLT
+    14001, 13968,             # saldo salário, rescisão indireta
+    14010, 13875,             # dano moral, insalubridade
+    13877, 13796,             # periculosidade, reflexos
 ]
 
 # ================================================================
@@ -130,7 +132,10 @@ PERFIS = {
     },
 }
 
-MOVIMENTOS_DECISAO = {219, 237, 193, 11009, 26}
+MOVIMENTOS_PROCEDENTE  = {219, 11009}   # Procedência / Procedência do Pedido
+MOVIMENTOS_IMPROCEDENTE = {220}          # Improcedência
+MOVIMENTOS_PARCIAL      = {221, 237}     # Procedência em Parte
+MOVIMENTOS_DECISAO = MOVIMENTOS_PROCEDENTE | MOVIMENTOS_IMPROCEDENTE | MOVIMENTOS_PARCIAL | {193, 26}
 
 CAMPOS_CSV = [
     "numero_processo", "tribunal", "segmento",
@@ -146,23 +151,35 @@ CAMPOS_CSV = [
 # ================================================================
 
 def extrair_resultado(movimentos: list) -> int | None:
-    PROC    = ["julgo procedente", "julgo totalmente procedente", "dou provimento",
-               "provejo o recurso", "condeno o reu", "condeno a re", "acolho o pedido"]
-    IMPROC  = ["julgo improcedente", "julgo totalmente improcedente", "nego provimento",
-               "improcedente o pedido", "indefiro o pedido", "rejeito o pedido", "denego"]
-    PARCIAL = ["parcialmente procedente", "procedente em parte",
-               "acolho parcialmente", "provejo em parte"]
+    PROC_TEXTO    = ["julgo procedente", "julgo totalmente procedente", "dou provimento",
+                     "provejo o recurso", "condeno o reu", "condeno a re", "acolho o pedido"]
+    IMPROC_TEXTO  = ["julgo improcedente", "julgo totalmente improcedente", "nego provimento",
+                     "improcedente o pedido", "indefiro o pedido", "rejeito o pedido", "denego"]
+    PARCIAL_TEXTO = ["parcialmente procedente", "procedente em parte",
+                     "acolho parcialmente", "provejo em parte"]
 
     for mov in reversed(movimentos):
-        if mov.get("codigo") not in MOVIMENTOS_DECISAO:
+        cod = mov.get("codigo")
+        if cod not in MOVIMENTOS_DECISAO:
             continue
-        c = mov.get("complemento", "").lower()
-        if any(p in c for p in PARCIAL):
+
+        # Classificação direta pelo código (DataJud não preenche complemento)
+        if cod in MOVIMENTOS_PARCIAL:
             return None
-        if any(p in c for p in PROC) and not any(p in c for p in IMPROC):
+        if cod in MOVIMENTOS_PROCEDENTE:
             return 1
-        if any(p in c for p in IMPROC) and not any(p in c for p in PROC):
+        if cod in MOVIMENTOS_IMPROCEDENTE:
             return 0
+
+        # Fallback: tentar pelo texto do complemento (ex: sentença código 26 ou 193)
+        c = mov.get("complemento", "").lower()
+        if c:
+            if any(p in c for p in PARCIAL_TEXTO):
+                return None
+            if any(p in c for p in PROC_TEXTO) and not any(p in c for p in IMPROC_TEXTO):
+                return 1
+            if any(p in c for p in IMPROC_TEXTO) and not any(p in c for p in PROC_TEXTO):
+                return 0
     return None
 
 
@@ -198,7 +215,7 @@ def processar_hit(hit: dict, segmento: str) -> dict | None:
 def montar_query(assunto_cod: int, search_after=None) -> dict:
     q = {
         "size": 100,
-        "sort": [{"dataAjuizamento": {"order": "asc"}}, {"_id": {"order": "asc"}}],
+        "sort": [{"dataAjuizamento": {"order": "asc"}},{"numeroProcesso.keyword": {"order": "asc"}}],
         "query": {"bool": {"must": [
             {"match": {"assuntos.codigo": assunto_cod}},
             {"range": {"dataAjuizamento": {"gte": DATA_INICIO, "lte": DATA_FIM}}},
@@ -271,16 +288,16 @@ async def main():
     n_trts        = len(cfg["trabalho"])
 
     print("=" * 62)
-    print(f"  COLETA DataJud")
+    print("  COLETA DataJud")
     print(f"  Perfil  : {cfg['desc']}")
     print(f"  TJs     : {n_tjs} ({', '.join(cfg['estaduais'][:5])}{'...' if n_tjs > 5 else ''})")
     print(f"  TRTs    : {n_trts} ({', '.join(cfg['trabalho'][:5])}{'...' if n_trts > 5 else ''})")
-    print(f"  Período : {DATA_INICIO} → {DATA_FIM}")
+    print(f"  Periodo : {DATA_INICIO} a {DATA_FIM}")
     print(f"  Limite  : {cfg['limite']:,} processos/tribunal")
     print("=" * 62)
 
     if API_KEY == "SUA_CHAVE_AQUI":
-        print("\n  ⚠️  Configure sua API Key em 0-jus/.env:")
+        print("\n  AVISO: Configure sua API Key em 0-jus/.env:")
         print("      DATAJUD_API_KEY=sua_chave")
         print("      -> https://datajud.cnj.jus.br\n")
         return
@@ -300,7 +317,7 @@ async def main():
         async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
             for alias in cfg["estaduais"]:
                 nome = TRIBUNAIS_ESTADUAIS[alias][0]
-                print(f"\n  📂  {nome} (estadual)")
+                print(f"\n  [{nome}] (estadual)")
                 n = await coletar_tribunal(
                     session, alias, "estadual",
                     cfg["assuntos_estaduais"], cfg["limite"], writer, lock,
@@ -310,7 +327,7 @@ async def main():
 
             for alias in cfg["trabalho"]:
                 nome = TRIBUNAIS_TRABALHO[alias][0]
-                print(f"\n  📂  {nome} (trabalho)")
+                print(f"\n  [{nome}] (trabalho)")
                 n = await coletar_tribunal(
                     session, alias, "trabalho",
                     cfg["assuntos_trabalho"], cfg["limite"], writer, lock,
@@ -320,12 +337,12 @@ async def main():
 
     elapsed = time.time() - t0
     print(f"\n{'='*62}")
-    print(f"  CONCLUÍDO")
+    print("  CONCLUIDO")
     print(f"  Total   : {total:,} processos")
     print(f"  Tempo   : {elapsed/60:.1f} min")
     print(f"  Arquivo : {out}")
     print(f"{'='*62}")
-    print(f"\n  Próximo: python -m jurimetria.coleta.consolidar")
+    print("  Proximo: python -m jurimetria.coleta.consolidar")
 
 
 if __name__ == "__main__":
