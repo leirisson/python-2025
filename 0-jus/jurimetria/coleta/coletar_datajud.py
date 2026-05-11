@@ -5,9 +5,13 @@ Coleta processos da API pública DataJud (CNJ).
 Cobre todos os TJs estaduais e TRTs.
 
 Como usar:
-  1. Configure DATAJUD_API_KEY em 0-jus/.env
-  2. Ajuste PERFIL_ATIVO abaixo (mvp | estaduais | trabalho | completo)
-  3. Execute:
+  1. Configure as variáveis em 0-jus/.env:
+       DATAJUD_API_KEY=sua_chave
+       COLETA_PERFIL=mvp          # mvp | estaduais | trabalho | completo
+       COLETA_DATA_INICIO=2020-01-01
+       COLETA_DATA_FIM=2024-12-31
+       COLETA_LIMITE=5000         # processos por tribunal
+  2. Execute:
        python -m jurimetria.coleta.coletar_datajud
 
 Para obter a API Key (gratuita):
@@ -33,9 +37,10 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 API_KEY  = os.getenv("DATAJUD_API_KEY", "SUA_CHAVE_AQUI")
 BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 
-PERFIL_ATIVO        = "mvp"
-DATA_INICIO         = "2020-01-01"
-DATA_FIM            = "2024-12-31"
+PERFIL_ATIVO        = os.getenv("COLETA_PERFIL", "mvp")
+DATA_INICIO         = os.getenv("COLETA_DATA_INICIO", "2020-01-01")
+DATA_FIM            = os.getenv("COLETA_DATA_FIM", "2024-12-31")
+LIMITE_ENV          = int(os.getenv("COLETA_LIMITE", "5000"))
 PAUSA_ENTRE_PAGINAS = 0.5
 
 # ================================================================
@@ -260,9 +265,10 @@ async def coletar_tribunal(session, alias, segmento, assuntos, limite, writer, l
 # ================================================================
 
 async def main():
-    cfg    = PERFIS[PERFIL_ATIVO]
-    n_tjs  = len(cfg["estaduais"])
-    n_trts = len(cfg["trabalho"])
+    cfg           = PERFIS[PERFIL_ATIVO]
+    cfg["limite"] = LIMITE_ENV
+    n_tjs         = len(cfg["estaduais"])
+    n_trts        = len(cfg["trabalho"])
 
     print("=" * 62)
     print(f"  COLETA DataJud")
