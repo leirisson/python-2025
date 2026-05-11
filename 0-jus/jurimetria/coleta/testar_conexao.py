@@ -9,10 +9,15 @@ Execute:  python -m jurimetria.coleta.testar_conexao
 
 import asyncio
 import os
+import sys
 
 import aiohttp
 from dotenv import load_dotenv
 from pathlib import Path
+
+# Força UTF-8 no stdout para suportar emojis no Windows
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
