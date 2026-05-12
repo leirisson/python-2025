@@ -87,8 +87,8 @@ ASSUNTOS_TRABALHO  = []   # não usado — coleta por movimento de decisão
 
 PERFIS = {
     "mvp": {
-        "desc":               "MVP — 3 TJs + 3 TRTs, 5k por tribunal",
-        "estaduais":          ["tjsp", "tjrj", "tjmg"],
+        "desc":               "MVP — 4 TJs + 3 TRTs, 5k por tribunal",
+        "estaduais":          ["tjsp", "tjrj", "tjmg", "tjam"],
         "trabalho":           ["trt2", "trt3", "trt15"],
         "assuntos_estaduais": ASSUNTOS_ESTADUAIS[:6],
         "assuntos_trabalho":  ASSUNTOS_TRABALHO[:5],
