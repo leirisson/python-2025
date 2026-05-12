@@ -213,13 +213,13 @@ def processar_hit(hit: dict, segmento: str) -> dict | None:
 
 
 def montar_query(assunto_cod: int, search_after=None) -> dict:
+    filtros = [{"match": {"assuntos.codigo": assunto_cod}}]
+    if DATA_INICIO and DATA_FIM:
+        filtros.append({"range": {"dataAjuizamento": {"gte": DATA_INICIO, "lte": DATA_FIM}}})
     q = {
         "size": 100,
-        "sort": [{"dataAjuizamento": {"order": "asc"}},{"numeroProcesso.keyword": {"order": "asc"}}],
-        "query": {"bool": {"must": [
-            {"match": {"assuntos.codigo": assunto_cod}},
-            {"range": {"dataAjuizamento": {"gte": DATA_INICIO, "lte": DATA_FIM}}},
-        ]}},
+        "sort": [{"numeroProcesso.keyword": {"order": "asc"}}],
+        "query": {"bool": {"must": filtros}},
         "_source": [
             "numeroProcesso", "tribunal", "classe", "assuntos",
             "movimentos", "dataAjuizamento", "valor", "grau", "orgaoJulgador",
