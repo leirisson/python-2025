@@ -48,15 +48,15 @@ def treinar() -> tuple:
         use_label_encoder=False,
     )
 
-    print("🔄  Validação cruzada (5 folds)...")
+    print("Validacao cruzada (5 folds)...")
     cv     = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
     aucs   = cross_val_score(modelo_base, X, y, cv=cv, scoring="roc_auc")
     briers = cross_val_score(modelo_base, X, y, cv=cv, scoring="neg_brier_score")
 
-    print(f"    AUC-ROC médio : {aucs.mean():.4f} ± {aucs.std():.4f}")
-    print(f"    Brier score   : {(-briers.mean()):.4f} ± {briers.std():.4f}\n")
+    print(f"    AUC-ROC medio : {aucs.mean():.4f} +/- {aucs.std():.4f}")
+    print(f"    Brier score   : {(-briers.mean()):.4f} +/- {briers.std():.4f}\n")
 
-    print("⚙️   Calibrando probabilidades (Isotonic Regression)...")
+    print("Calibrando probabilidades (Isotonic Regression)...")
     modelo_calibrado = CalibratedClassifierCV(modelo_base, method="isotonic", cv=5)
     modelo_calibrado.fit(X, y)
 
@@ -65,19 +65,19 @@ def treinar() -> tuple:
     auc_final  = roc_auc_score(y, probs)
     brier_final = brier_score_loss(y, probs)
 
-    print(f"\n📊  Métricas finais (conjunto completo):")
+    print(f"\nMetricas finais (conjunto completo):")
     print(f"    AUC-ROC     : {auc_final:.4f}")
     print(f"    Brier score : {brier_final:.4f}  (0 = perfeito, 0.25 = chute)\n")
-    print("    Relatório de classificação:")
+    print("    Relatorio de classificacao:")
     print(classification_report(y, preds, target_names=["Improcedente", "Procedente"]))
 
     estimador_base = modelo_calibrado.calibrated_classifiers_[0].estimator
     importancias   = dict(zip(FEATURES, estimador_base.feature_importances_))
     importancias   = dict(sorted(importancias.items(), key=lambda x: x[1], reverse=True))
 
-    print("    Importância das features:")
+    print("    Importancia das features:")
     for feat, imp in importancias.items():
-        barra = "█" * int(imp * 40)
+        barra = "#" * int(imp * 40)
         print(f"      {feat:<30} {barra} {imp:.4f}")
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -98,8 +98,8 @@ def treinar() -> tuple:
     with open(MODELS_DIR / "metadata.json", "w", encoding="utf-8") as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅  Modelo salvo em {MODELS_DIR / 'modelo_jurimetria.pkl'}")
-    print(f"    Metadados   em {MODELS_DIR / 'metadata.json'}")
+    print(f"\nModelo salvo em {MODELS_DIR / 'modelo_jurimetria.pkl'}")
+    print(f"Metadados   em {MODELS_DIR / 'metadata.json'}")
 
     return modelo_calibrado, metadata
 

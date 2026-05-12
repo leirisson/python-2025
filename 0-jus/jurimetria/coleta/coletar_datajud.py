@@ -78,20 +78,8 @@ TRIBUNAIS_TRABALHO = {
 #  ASSUNTOS (códigos TPU do CNJ)
 # ================================================================
 
-ASSUNTOS_ESTADUAIS = [
-    7619, 10949, 9636, 6201, 7771,   # consumidor
-    10956, 6226, 7782, 9507, 6218, 6222,  # cível
-    9285, 9283, 9289,                # família
-]
-
-ASSUNTOS_TRABALHO = [
-    13787, 13769, 13186,      # horas extras
-    13994, 13996, 13995,      # rescisão: aviso prévio, férias, 13º
-    13998, 13999, 14000,      # FGTS e multas CLT
-    14001, 13968,             # saldo salário, rescisão indireta
-    14010, 13875,             # dano moral, insalubridade
-    13877, 13796,             # periculosidade, reflexos
-]
+ASSUNTOS_ESTADUAIS = []   # não usado — coleta por movimento de decisão
+ASSUNTOS_TRABALHO  = []   # não usado — coleta por movimento de decisão
 
 # ================================================================
 #  PERFIS
@@ -190,16 +178,18 @@ def processar_hit(hit: dict, segmento: str) -> dict | None:
     if lbl is None:
         return None
 
-    assuntos = src.get("assuntos", [{}])
-    ass      = assuntos[0] if assuntos else {}
-    orgao    = src.get("orgaoJulgador", {})
+    assuntos_raw = src.get("assuntos", [])
+    ass = next((a for a in assuntos_raw if isinstance(a, dict)), {})
+    orgao = src.get("orgaoJulgador", {})
+    if not isinstance(orgao, dict):
+        orgao = {}
 
     return {
         "numero_processo":  src.get("numeroProcesso", ""),
         "tribunal":         src.get("tribunal", ""),
         "segmento":         segmento,
-        "classe_codigo":    src.get("classe", {}).get("codigo", ""),
-        "classe_nome":      src.get("classe", {}).get("nome", ""),
+        "classe_codigo":    (src.get("classe") or {}).get("codigo", ""),
+        "classe_nome":      (src.get("classe") or {}).get("nome", ""),
         "assunto_codigo":   ass.get("codigo", ""),
         "assunto_nome":     ass.get("nome", ""),
         "data_ajuizamento": src.get("dataAjuizamento", "")[:10],
@@ -212,8 +202,13 @@ def processar_hit(hit: dict, segmento: str) -> dict | None:
     }
 
 
-def montar_query(assunto_cod: int, search_after=None) -> dict:
-    filtros = [{"match": {"assuntos.codigo": assunto_cod}}]
+def montar_query(search_after=None) -> dict:
+    # Busca processos que já têm movimento de decisão de mérito (219=Procedência, 220=Improcedência)
+    # Isso garante aproveitamento alto e balanceamento natural entre classes
+    filtros: list = [{"bool": {"should": [
+        {"term": {"movimentos.codigo": 219}},
+        {"term": {"movimentos.codigo": 220}},
+    ], "minimum_should_match": 1}}]
     if DATA_INICIO and DATA_FIM:
         filtros.append({"range": {"dataAjuizamento": {"gte": DATA_INICIO, "lte": DATA_FIM}}})
     q = {
@@ -231,13 +226,13 @@ def montar_query(assunto_cod: int, search_after=None) -> dict:
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(min=2, max=60), reraise=True)
-async def buscar_pagina(session, tribunal, assunto_cod, search_after=None):
+async def buscar_pagina(session, tribunal, search_after=None):
     url  = f"{BASE_URL}/api_publica_{tribunal}/_search"
     hdrs = {"Authorization": f"APIKey {API_KEY}", "Content-Type": "application/json"}
 
-    async with session.post(url, json=montar_query(assunto_cod, search_after), headers=hdrs) as r:
+    async with session.post(url, json=montar_query(search_after), headers=hdrs) as r:
         if r.status == 429:
-            print("      ⚠️  Rate limit — aguardando 60s...")
+            print("      Rate limit — aguardando 60s...")
             await asyncio.sleep(60)
             raise Exception("Rate limit")
         if r.status == 404:
@@ -250,30 +245,27 @@ async def buscar_pagina(session, tribunal, assunto_cod, search_after=None):
     return hits, (hits[-1].get("sort") if hits else None)
 
 
-async def coletar_tribunal(session, alias, segmento, assuntos, limite, writer, lock):
-    total = 0
-    for assunto_cod in assuntos:
+async def coletar_tribunal(session, alias, segmento, limite, writer, lock):
+    total        = 0
+    search_after = None
+    while True:
+        try:
+            hits, next_sa = await buscar_pagina(session, alias, search_after)
+        except Exception as e:
+            print(f"      ERRO {alias.upper()}: {e}")
+            break
+        if not hits:
+            break
+
+        linhas = [r for h in hits if (r := processar_hit(h, segmento))]
+        async with lock:
+            writer.writerows(linhas)
+        total += len(linhas)
+
         if limite and total >= limite:
             break
-        search_after = None
-        while True:
-            try:
-                hits, next_sa = await buscar_pagina(session, alias, assunto_cod, search_after)
-            except Exception as e:
-                print(f"      ❌  {alias.upper()}/assunto {assunto_cod}: {e}")
-                break
-            if not hits:
-                break
-
-            linhas = [r for h in hits if (r := processar_hit(h, segmento))]
-            async with lock:
-                writer.writerows(linhas)
-            total += len(linhas)
-
-            if limite and total >= limite:
-                break
-            search_after = next_sa
-            await asyncio.sleep(PAUSA_ENTRE_PAGINAS)
+        search_after = next_sa
+        await asyncio.sleep(PAUSA_ENTRE_PAGINAS)
     return total
 
 
@@ -319,8 +311,7 @@ async def main():
                 nome = TRIBUNAIS_ESTADUAIS[alias][0]
                 print(f"\n  [{nome}] (estadual)")
                 n = await coletar_tribunal(
-                    session, alias, "estadual",
-                    cfg["assuntos_estaduais"], cfg["limite"], writer, lock,
+                    session, alias, "estadual", cfg["limite"], writer, lock,
                 )
                 total += n
                 print(f"      -> {n:,} processos classificados")
@@ -329,8 +320,7 @@ async def main():
                 nome = TRIBUNAIS_TRABALHO[alias][0]
                 print(f"\n  [{nome}] (trabalho)")
                 n = await coletar_tribunal(
-                    session, alias, "trabalho",
-                    cfg["assuntos_trabalho"], cfg["limite"], writer, lock,
+                    session, alias, "trabalho", cfg["limite"], writer, lock,
                 )
                 total += n
                 print(f"      -> {n:,} processos classificados")

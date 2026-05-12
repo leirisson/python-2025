@@ -13,7 +13,6 @@ import numpy as np
 
 from jurimetria.features import (
     FEATURES,
-    adicionar_log_valor,
     adicionar_taxas_vitoria,
     encodar_categoricos,
     salvar_encoders,
@@ -55,7 +54,6 @@ def consolidar() -> pd.DataFrame:
     print(f"  Procedentes : {df['label'].sum():,} ({df['label'].mean()*100:.1f}%)")
 
     # ── 3. Features via módulo compartilhado ─────────────────────────
-    df = adicionar_log_valor(df)
     df = adicionar_taxas_vitoria(
         df,
         col_tribunal="tribunal",
@@ -80,9 +78,9 @@ def consolidar() -> pd.DataFrame:
     resumo.columns = ["processos", "taxa_proc"]
     print(resumo.to_string())
 
-    print(f"\n  ✅  Dataset final: {len(df_final):,} processos")
-    print(f"      Arquivo: {DATA_DIR / 'features.csv'}")
-    print(f"      Próximo: python scripts/pipeline_real.py  (ou só treinar o modelo)")
+    print(f"\n  Dataset final: {len(df_final):,} processos")
+    print(f"  Arquivo: {DATA_DIR / 'features.csv'}")
+    print("  Proximo: python -m jurimetria.modelo")
 
     return df_final
 

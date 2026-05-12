@@ -13,7 +13,6 @@ import pandas as pd
 FEATURES = [
     "tribunal_enc",
     "tema_enc",
-    "log_valor",
     "taxa_vitoria_juiz",
     "taxa_vitoria_tribunal",
     "taxa_vitoria_tema",

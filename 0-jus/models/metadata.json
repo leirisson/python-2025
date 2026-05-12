@@ -1,0 +1,28 @@
+{
+  "features": [
+    "tribunal_enc",
+    "tema_enc",
+    "taxa_vitoria_juiz",
+    "taxa_vitoria_tribunal",
+    "taxa_vitoria_tema",
+    "prec_norm",
+    "qualidade_provas",
+    "segundo_grau"
+  ],
+  "n_treino": 30190,
+  "auc_cv_medio": 0.8705,
+  "auc_cv_std": 0.0028,
+  "brier_score": 0.1492,
+  "importancias": {
+    "taxa_vitoria_juiz": 0.4317,
+    "taxa_vitoria_tema": 0.2335,
+    "taxa_vitoria_tribunal": 0.0987,
+    "tribunal_enc": 0.0796,
+    "segundo_grau": 0.0652,
+    "prec_norm": 0.0496,
+    "tema_enc": 0.0416,
+    "qualidade_provas": 0.0
+  },
+  "threshold": 0.5,
+  "versao": "1.0.0"
+}
