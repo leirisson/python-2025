@@ -23,6 +23,6 @@
     "tema_enc": 0.0416,
     "qualidade_provas": 0.0
   },
-  "threshold": 0.5,
+  "threshold": 0.6,
   "versao": "1.0.0"
 }

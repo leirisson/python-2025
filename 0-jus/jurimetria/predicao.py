@@ -26,6 +26,8 @@ with open(MODELS_DIR / "modelo_jurimetria.pkl", "rb") as f:
 with open(MODELS_DIR / "metadata.json", encoding="utf-8") as f:
     META = json.load(f)
 
+THRESHOLD = META.get("threshold", 0.60)
+
 with open(MODELS_DIR / "encoders.json", encoding="utf-8") as f:
     ENCODERS = json.load(f)
 
@@ -36,16 +38,16 @@ def preparar_caso(caso: dict) -> np.ndarray:
 
     Campos esperados:
       tribunal          : str   (ex: "TJSP")
-      tema              : str   (ex: "Dano moral consumidor")
-      valor_causa       : float (em reais)
+      tema              : str   (código do assunto, ex: "10433")
       taxa_vitoria_juiz : float (0.0 a 1.0)
-      prec_favoraveis   : int   (quantidade de precedentes)
-      qualidade_provas  : int   (0=fraca, 1=média, 2=forte)
-      segundo_grau      : int   (0=1ª instância, 1=2ª instância)
+      taxa_vitoria_tribunal : float (0.0 a 1.0)
+      taxa_vitoria_tema : float (0.0 a 1.0)
+      prec_favoraveis   : int   (quantidade de movimentos como proxy)
+      qualidade_provas  : int   (0=fraca, 1=media, 2=forte)
+      segundo_grau      : int   (0=1a instancia, 1=2a instancia)
     """
     enc_trib  = ENCODERS["tribunal"].get(caso["tribunal"], 0)
-    enc_tema  = ENCODERS["tema"].get(caso["tema"], 0)
-    log_valor = np.log1p(caso.get("valor_causa", 0))
+    enc_tema  = ENCODERS["tema"].get(str(caso.get("tema", "")), 0)
     prec_norm = min(caso.get("prec_favoraveis", 0) / 50.0, 1.0)
 
     taxa_trib = caso.get("taxa_vitoria_tribunal", 0.55)
@@ -55,7 +57,6 @@ def preparar_caso(caso: dict) -> np.ndarray:
     vetor = [
         enc_trib,
         enc_tema,
-        log_valor,
         taxa_juiz,
         taxa_trib,
         taxa_tema,
@@ -83,9 +84,10 @@ def prever(caso: dict) -> dict:
     n_casos   = 200 + int(prob * 600)
     intervalo = calcular_intervalo(prob, n_casos)
 
-    if pct >= 65:
+    threshold_pct = THRESHOLD * 100
+    if pct >= threshold_pct + 10:
         faixa, cor = "Alta", "verde"
-    elif pct >= 40:
+    elif pct >= threshold_pct - 10:
         faixa, cor = "Moderada", "amarelo"
     else:
         faixa, cor = "Baixa", "vermelho"
@@ -103,7 +105,7 @@ def prever(caso: dict) -> dict:
         "faixa":               faixa,
         "cor":                 cor,
         "n_casos_base":        n_casos,
-        "resumo":              f"{pct}% ± {intervalo}% (base: {n_casos} casos similares)",
+        "resumo":              f"{pct}% +/- {intervalo}% (base: {n_casos} casos similares)",
         "contribuicoes_shap":  contrib_ord,
     }
 
@@ -111,10 +113,9 @@ def prever(caso: dict) -> dict:
 if __name__ == "__main__":
     caso_exemplo = {
         "tribunal":              "TJSP",
-        "tema":                  "Dano moral consumidor",
-        "valor_causa":           15_000,
+        "tema":                  "10433",
         "taxa_vitoria_juiz":     0.68,
-        "taxa_vitoria_tribunal": 0.55,
+        "taxa_vitoria_tribunal": 0.75,
         "taxa_vitoria_tema":     0.65,
         "prec_favoraveis":       22,
         "qualidade_provas":      2,
@@ -124,13 +125,12 @@ if __name__ == "__main__":
     resultado = prever(caso_exemplo)
 
     print("=" * 52)
-    print("  PREVISÃO DE CHANCES — RESULTADO")
+    print("  PREVISAO DE CHANCES - RESULTADO")
     print("=" * 52)
     print(f"\n  Probabilidade : {resultado['resumo']}")
     print(f"  Faixa         : {resultado['faixa']} chance  [{resultado['cor']}]")
-    print(f"\n  Contribuição de cada fator (SHAP):")
+    print(f"\n  Contribuicao de cada fator (SHAP):")
     for feat, val in resultado["contribuicoes_shap"].items():
-        sinal = "+" if val >= 0 else ""
-        barra = ("▲" if val >= 0 else "▼") * min(int(abs(val) * 20), 12)
-        print(f"    {feat:<30} {sinal}{val:+.3f}  {barra}")
+        sinal = "+" if val >= 0 else "-"
+        print(f"    {feat:<30} {val:+.3f}")
     print("=" * 52)

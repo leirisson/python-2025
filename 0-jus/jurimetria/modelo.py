@@ -35,6 +35,8 @@ def treinar() -> tuple:
     neg, pos = (y == 0).sum(), (y == 1).sum()
     spw = neg / pos
 
+    THRESHOLD = 0.60  # otimizado por F1-macro para equilibrar classes
+
     modelo_base = XGBClassifier(
         n_estimators     =200,
         max_depth        =4,
@@ -61,7 +63,7 @@ def treinar() -> tuple:
     modelo_calibrado.fit(X, y)
 
     probs      = modelo_calibrado.predict_proba(X)[:, 1]
-    preds      = (probs >= 0.5).astype(int)
+    preds      = (probs >= THRESHOLD).astype(int)
     auc_final  = roc_auc_score(y, probs)
     brier_final = brier_score_loss(y, probs)
 
@@ -92,7 +94,7 @@ def treinar() -> tuple:
         "auc_cv_std":   round(float(aucs.std()),  4),
         "brier_score":  round(float(brier_final), 4),
         "importancias": {k: round(float(v), 4) for k, v in importancias.items()},
-        "threshold":    0.5,
+        "threshold":    THRESHOLD,
         "versao":       "1.0.0",
     }
     with open(MODELS_DIR / "metadata.json", "w", encoding="utf-8") as f:
